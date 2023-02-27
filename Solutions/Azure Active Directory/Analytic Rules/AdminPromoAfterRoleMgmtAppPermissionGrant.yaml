@@ -37,9 +37,10 @@ query: |
   | where AppRole has "RoleManagement.ReadWrite.Directory"
   | extend InitiatingApp = tostring(parse_json(tostring(InitiatedBy.app)).displayName)
   | extend Initiator = iif(isnotempty(InitiatingApp), InitiatingApp, tostring(parse_json(tostring(InitiatedBy.user)).userPrincipalName))
-  | extend Target = tostring(parse_json(tostring(TargetResources.modifiedProperties[4].newValue)))
-  | extend TargetId = tostring(parse_json(tostring(TargetResources.modifiedProperties[3].newValue)))
-  | project TimeGenerated, OperationName, Initiator, Target, TargetId, Result
+  | extend Target = tostring(parse_json(tostring(TargetResources.modifiedProperties[6].newValue)))
+  | extend TargetId = tostring(parse_json(tostring(TargetResources.modifiedProperties[7].newValue)))
+  | extend callerIpAddress = tostring(InitiatedBy.user.ipAddress)
+  | project TimeGenerated, OperationName, Initiator, Target, TargetId, Result, callerIpAddress
   | join kind=innerunique (
     AuditLogs
     | where LoggedByService =~ "Core Directory"
@@ -58,12 +59,13 @@ query: |
     | extend Target = iif(isnotempty(TargetUser), TargetUser, tostring(TargetResources.displayName))
     | extend TargetType = tostring(TargetResources.type)
     | extend TargetId = tostring(TargetResources.id)
-    | project TimeGenerated, OperationName,  RoleName, Initiator, InitiatorId, Target, TargetId, TargetType, Result
+    | extend callerIpAddress = tostring(InitiatedBy.user.ipAddress)
+    | project TimeGenerated, OperationName,  RoleName, Initiator, InitiatorId, Target, TargetId, TargetType, Result, callerIpAddress
   ) on $left.TargetId == $right.InitiatorId
   | extend TimeRoleMgGrant = TimeGenerated, TimeAdminPromo = TimeGenerated1, ServicePrincipal = Initiator1, ServicePrincipalId = InitiatorId,
-    TargetObject = Target1, TargetObjectId = TargetId1, TargetObjectType = TargetType
+    TargetObject = Target1, TargetObjectId = TargetId1, TargetObjectType = TargetType, callerIpAddress= callerIpAddress
   | where TimeRoleMgGrant < TimeAdminPromo
-  | project TimeRoleMgGrant, TimeAdminPromo, RoleName, ServicePrincipal, ServicePrincipalId, TargetObject, TargetObjectId, TargetObjectType
+  | project TimeRoleMgGrant, TimeAdminPromo, RoleName, ServicePrincipal, ServicePrincipalId, TargetObject, TargetObjectId, TargetObjectType, callerIpAddress
 entityMappings:
   - entityType: Account
     fieldMappings:
